@@ -1,5 +1,6 @@
 import subprocess
-from flask import Flask, request, jsonify, render_template_string, escape
+from flask import Flask, request, jsonify, render_template_string
+from html import escape  # Flask の escape ではなく標準ライブラリの escape を使用
 
 app = Flask(__name__)
 
