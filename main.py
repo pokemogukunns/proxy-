@@ -1,6 +1,7 @@
 import subprocess
 from flask import Flask, request, jsonify, render_template_string
-from html import escape  # Flask の escape ではなく標準ライブラリの escape を使用
+from html import escape
+from urllib.parse import unquote  # URLをデコードするためのモジュール
 
 app = Flask(__name__)
 
@@ -34,8 +35,10 @@ def proxy():
         return jsonify({"error": "URL is required"}), 400
 
     try:
+        # URLをデコード
+        decoded_url = unquote(url)
         # curlコマンドを実行
-        command = ["curl", "-s", url]
+        command = ["curl", "-s", decoded_url]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         # HTMLをエスケープして安全に表示
         escaped_content = escape(result.stdout)
@@ -49,13 +52,15 @@ def proxy():
         <body>
             <h1>取得したコード</h1>
             <pre style="background-color: #f4f4f4; padding: 10px; border: 1px solid #ddd;">{escaped_content}</pre>
-            <a href="/home">戻る</a>
+            <a href="./home">戻る</a>
         </body>
         </html>
         """
         return html
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"Failed to fetch URL. {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # / にアクセスされた場合は404エラーを返す
 @app.route("/", methods=["GET"])
