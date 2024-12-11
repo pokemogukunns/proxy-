@@ -1,0 +1,6 @@
+pip
+Flask
+requests
+flask_cors
+Jinja2
+fastapi
