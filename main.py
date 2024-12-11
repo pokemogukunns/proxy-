@@ -1,5 +1,5 @@
 import subprocess
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, escape
 
 app = Flask(__name__)
 
@@ -15,7 +15,7 @@ def home():
     </head>
     <body>
         <h1>URLからコードを取得</h1>
-        <form method="get" action="/proxy">
+        <form method="get" action="./proxy">
             <label for="url">取得するURLを入力してください:</label><br>
             <input type="text" id="url" name="url" placeholder="https://example.com" style="width: 80%;"><br><br>
             <button type="submit">取得</button>
@@ -36,7 +36,23 @@ def proxy():
         # curlコマンドを実行
         command = ["curl", "-s", url]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-        return result.stdout  # レスポンスの内容をそのまま返す
+        # HTMLをエスケープして安全に表示
+        escaped_content = escape(result.stdout)
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <title>取得結果</title>
+        </head>
+        <body>
+            <h1>取得したコード</h1>
+            <pre style="background-color: #f4f4f4; padding: 10px; border: 1px solid #ddd;">{escaped_content}</pre>
+            <a href="/home">戻る</a>
+        </body>
+        </html>
+        """
+        return html
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"Failed to fetch URL. {e}"}), 500
 
