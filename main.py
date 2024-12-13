@@ -1,71 +1,67 @@
-import subprocess
-from flask import Flask, request, jsonify, render_template_string
-from html import escape
-from urllib.parse import unquote  # URLをデコードするためのモジュール
+import os
+import requests
+import shutil
+from flask import Flask, request, render_template_string
+from urllib.parse import urljoin
 
 app = Flask(__name__)
 
-# /home でテキストボックスを表示
+# ThingProxy URL
+PROXY_URL = "https://thingproxy.freeboard.io/fetch/"
+
 @app.route("/home", methods=["GET"])
 def home():
-    html = """
+    html_form = """
     <!DOCTYPE html>
     <html lang="ja">
     <head>
-        <meta charset="UTF-8">
-        <title>URLプロキシ</title>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Proxy URL Input</title>
     </head>
     <body>
-        <h1>URLからコードを取得</h1>
-        <form method="get" action="./proxy">
-            <label for="url">取得するURLを入力してください:</label><br>
-            <input type="text" id="url" name="url" placeholder="https://example.com" style="width: 80%;"><br><br>
-            <button type="submit">取得</button>
-        </form>
+      <h1>URLを入力してください</h1>
+      <form action="/proxy" method="get">
+        <label for="url">URL:</label>
+        <input type="text" id="url" name="url" placeholder="https://example.com" required>
+        <button type="submit">送信</button>
+      </form>
     </body>
     </html>
     """
-    return render_template_string(html)
+    return render_template_string(html_form)
 
-# /proxy で指定されたURLの内容を取得
 @app.route("/proxy", methods=["GET"])
 def proxy():
-    url = request.args.get("url")
-    if not url:
-        return jsonify({"error": "URL is required"}), 400
+    target_url = request.args.get("url")
+    if not target_url:
+        return "<h1>エラー: URLパラメータが必要です。</h1>", 400
 
+    if not target_url.startswith("http://") and not target_url.startswith("https://"):
+        return "<h1>エラー: URLはhttp://またはhttps://で始まる必要があります。</h1>", 400
+
+    # ThingProxy URLに変換
+    proxy_url = PROXY_URL + target_url
+
+    # curl コマンドを生成
+    curl_command = f"curl -X GET {proxy_url}"
+
+    # 実際にリソースを取得して表示
     try:
-        # URLをデコード
-        decoded_url = unquote(url)
-        # curlコマンドを実行
-        command = ["curl", "-s", decoded_url]
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        # HTMLをエスケープして安全に表示
-        escaped_content = escape(result.stdout)
-        html = f"""
-        <!DOCTYPE html>
-        <html lang="ja">
-        <head>
-            <meta charset="UTF-8">
-            <title>取得結果</title>
-        </head>
-        <body>
-            <h1>取得したコード</h1>
-            <pre style="background-color: #f4f4f4; padding: 10px; border: 1px solid #ddd;">{escaped_content}</pre>
-            <a href="./home">戻る</a>
-        </body>
-        </html>
-        """
-        return html
-    except subprocess.CalledProcessError as e:
-        return jsonify({"error": f"Failed to fetch URL. {e}"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        response = requests.get(proxy_url)
+        response.raise_for_status()
 
-# / にアクセスされた場合は404エラーを返す
-@app.route("/", methods=["GET"])
-def root():
-    return "404 Not Found", 404
+        # 取得したHTMLを表示
+        return f"""
+        <h2>curl コマンド:</h2>
+        <pre>{curl_command}</pre>
+        <h2>取得したリソース:</h2>
+        <pre>{response.text}</pre>
+        """
+
+    except Exception as e:
+        return f"<h1>エラーが発生しました。</h1><p>{str(e)}</p>", 500
 
 if __name__ == "__main__":
     app.run(debug=True)
+
